@@ -1,0 +1,42 @@
+# Environment / secrets — NEVER commit
+.env
+
+# Package build artifacts
+*.egg-info/
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Virtual environments
+venv/
+.venv/
+env/
+
+# Streamlit
+.streamlit/
+
+# Temp files generated at runtime
+test_assets/
+*.mp4
+*.mov
+*.avi
+*.mkv
+*.webm
+*.zip
+# OS
+.DS_Store
+Thumbs.db
+
+*.pdf
+*.docx
+
+models/
+data/ 
