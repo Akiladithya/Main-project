@@ -52,11 +52,11 @@ class MockVectorStore:
         for c in concepts:
             self._store[c.concept_id] = c
     def search(self, q, top_k=10, **kw): return list(self._store.values())[:top_k]
-    def get_by_video(self, vid): return [c for c in self._store.values() if c.video_id == vid]
-    def get_by_time_range(self, vid, s, e):
-        return [c for c in self._store.values() if c.video_id == vid and c.start_time <= e and c.end_time >= s]
-    def delete_by_video(self, vid):
-        self._store = {k: v for k, v in self._store.items() if v.video_id != vid}
+    def get_by_video(self, video_id): return [c for c in self._store.values() if c.video_id == video_id]
+    def get_by_time_range(self, video_id, start_time, end_time):
+        return [c for c in self._store.values() if c.video_id == video_id and c.start_time <= end_time and c.end_time >= start_time]
+    def delete_by_video(self, video_id):
+        self._store = {k: v for k, v in self._store.items() if v.video_id != video_id}
 
 
 # --------------------------------------------------------------------------- #

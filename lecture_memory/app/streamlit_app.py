@@ -230,61 +230,31 @@ def _render_evidence_details(
     # ----------------------------------------------------------
 
     concepts = []
-
     for evidence_id in answer.evidence_ids:
-
-        concept = concept_lookup.get(
-
-            evidence_id
-
-        )
-
+        concept = concept_lookup.get(evidence_id)
         if concept is not None:
-
             concepts.append(concept)
 
     if not concepts:
-
         return
 
     with st.expander(
-
-        f"🎞️ Lecture Evidence ({len(concepts)} relevant sections)"
-
+        f"🎞️ Lecture Evidence ({len(concepts)} relevant sections)",
+        expanded=True,
     ):
-
         st.caption(
-
-            "These sections show how the answer is grounded "
-
-            "in the lecture's speech, visuals and temporal context."
-
+            "These sections show the lecture evidence ranked by relevance to your question."
         )
 
         for index, concept in enumerate(
-
             concepts,
-
             start=1,
-
         ):
-
-            start = _format_time(
-
-                concept.start_time
-
-            )
-
-            end = _format_time(
-
-                concept.end_time
-
-            )
+            start = _format_time(concept.start_time)
+            end = _format_time(concept.end_time)
 
             st.markdown(
-
                 f"### {index}. Lecture section — {start} to {end}"
-
             )
 
             # --------------------------------------------------

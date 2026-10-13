@@ -67,7 +67,7 @@ class TemporalRetriever:
         # 2. Semantic seed retrieval
         # ---------------------------------------------------------
         candidates = self._store.search(
-            query_embedding=query_embedding,
+            query_embedding,
             top_k=top_k,
             subject=subject,
             video_id=video_id,
@@ -112,9 +112,9 @@ class TemporalRetriever:
             )
 
             nearby = self._store.get_by_time_range(
-                video_id=seed_concept.video_id,
-                start_time=start_time,
-                end_time=end_time,
+                seed_concept.video_id,
+                start_time,
+                end_time,
             )
 
             for concept in nearby:
@@ -137,9 +137,8 @@ class TemporalRetriever:
         # 6. Final top-k cutoff
         # ---------------------------------------------------------
         #
-        # Semantic relevance is used for the final ordering.
-        # Temporal expansion only determines which additional
-        # concepts become available as context.
+        # Semantic relevance is used for the final ordering so the
+        # most relevant concepts appear first.
         # ---------------------------------------------------------
         final_results = ranked[:top_k]
 

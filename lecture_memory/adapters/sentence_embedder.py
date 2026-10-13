@@ -28,8 +28,8 @@ class SentenceEmbedder(IEmbedder):
     def _load(self):
         if self._model is None:
             from sentence_transformers import SentenceTransformer
-            self._model = SentenceTransformer(self._model_name)
-            logger.info(f"embedder_loaded | model={self._model_name}")
+            self._model = SentenceTransformer(self._model_name, device="cpu")
+            logger.info(f"embedder_loaded | model={self._model_name} | device=cpu")
 
     def embed(self, text: str) -> List[float]:
         self._load()

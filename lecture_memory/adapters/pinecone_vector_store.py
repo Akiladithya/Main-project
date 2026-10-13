@@ -78,6 +78,7 @@ class PineconeVectorStore(IVectorStore):
             )
 
         self._index = self._pc.Index(self._index_name)
+        self._video_cache: dict[str, List[MultimodalConcept]] = {}
         logger.info(f"pinecone_ready | index={self._index_name}")
 
     # ========================================================
@@ -108,6 +109,10 @@ class PineconeVectorStore(IVectorStore):
                 )
 
             self._index.upsert(vectors=vectors)
+
+        for concept in concepts:
+            if concept.video_id:
+                self._video_cache.pop(concept.video_id, None)
 
         logger.info(f"pinecone_upserted | concepts={total} | index={self._index_name}")
 
@@ -161,8 +166,11 @@ class PineconeVectorStore(IVectorStore):
         self,
         video_id: str,
     ) -> List[MultimodalConcept]:
+        if video_id in self._video_cache:
+            return list(self._video_cache[video_id])
+
         filter_dict = {"video_id": {"$eq": video_id}}
-        dummy_vector = [0.0] * _DEFAULT_DIMENSION
+        dummy_vector = [0.01] * _DEFAULT_DIMENSION
 
         try:
             res = self._index.query(
@@ -190,7 +198,8 @@ class PineconeVectorStore(IVectorStore):
 
         # Sort chronologically by start_time
         concepts.sort(key=lambda c: c.start_time)
-        return concepts
+        self._video_cache[video_id] = concepts
+        return list(concepts)
 
     # ========================================================
     # GET CONCEPTS IN TIME RANGE
@@ -217,6 +226,7 @@ class PineconeVectorStore(IVectorStore):
         self,
         video_id: str,
     ) -> None:
+        self._video_cache.pop(video_id, None)
         try:
             self._index.delete(filter={"video_id": {"$eq": video_id}})
             logger.info(f"pinecone_deleted | video_id={video_id}")
