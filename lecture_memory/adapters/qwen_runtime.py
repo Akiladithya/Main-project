@@ -105,16 +105,22 @@ class QwenRuntime:
             print(f"Loading Qwen runtime: {model_id}")
 
         # ========================================================
-        # GPU CHECK
+        # DEVICE SELECTION
         # ========================================================
+        from lecture_memory.config.settings import settings as _settings
+        if _settings.use_cpu:
+            # Force CPU execution
+            self.device = "cpu"
+            print("CPU mode enabled via settings; loading model on CPU.")
+        else:
+            # GPU mode: ensure CUDA is available and report the device.
+            if not torch.cuda.is_available():
+                raise RuntimeError(
+                    "CUDA is not available. Qwen2.5-VL is configured to run on the GPU."
+                )
+            print(f"CUDA device: {torch.cuda.get_device_name(0)}")
+            # No need to set a read‑only property; the model's device will be used later.
 
-        if not torch.cuda.is_available():
-            raise RuntimeError(
-                "CUDA is not available. "
-                "Qwen2.5-VL is configured to run on the GPU."
-            )
-
-        print(f"CUDA device: {torch.cuda.get_device_name(0)}")
 
         # ========================================================
         # 4-BIT QUANTIZATION
@@ -152,11 +158,13 @@ class QwenRuntime:
         print(f"Loading Qwen model in 4-bit from: {self.model_id}...")
 
         is_local = os.path.isdir(self.model_id)
+        # Determine device_map based on settings
+        device_map = {"": 0} if not _settings.use_cpu else "cpu"
         self.model = Qwen2_5_VLForConditionalGeneration.from_pretrained(
             self.model_id,
             quantization_config=quant_config,
             dtype=torch.float16,
-            device_map={"": 0},
+            device_map=device_map,
             low_cpu_mem_usage=True,
             local_files_only=is_local,
         )

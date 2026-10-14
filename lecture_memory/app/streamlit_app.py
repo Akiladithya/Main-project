@@ -197,37 +197,65 @@ def _build_concept_lookup(
 
         return {}
 
+# ----------------------------------------------------------
+# CSS: YouTube-style answer panel
+# ----------------------------------------------------------
+st.markdown(
+    """
+    <style>
+    .ts-chip {
+        display: inline-block;
+        background: #1e3a5f;
+        color: #7ec8f7;
+        border: 1px solid #2a5080;
+        border-radius: 6px;
+        padding: 1px 8px;
+        font-size: 0.78rem;
+        font-family: monospace;
+        font-weight: 600;
+        margin-left: 6px;
+        vertical-align: middle;
+        white-space: nowrap;
+    }
+    .concept-bullet {
+        margin: 6px 0;
+        padding: 8px 14px;
+        background: #111827;
+        border-left: 3px solid #3b82f6;
+        border-radius: 0 6px 6px 0;
+        line-height: 1.55;
+    }
+    .concept-bullet b { color: #e2e8f0; }
+    .ev-card {
+        background: #0f1929;
+        border: 1px solid #1e3a5f;
+        border-radius: 8px;
+        padding: 10px 16px;
+        margin: 6px 0;
+    }
+    .ev-header { color: #94a3b8; font-size: 0.78rem; margin-bottom: 4px; }
+    .ev-body   { color: #cbd5e1; font-size: 0.9rem; line-height: 1.5; }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
+
 def _render_evidence_details(
-
     result,
-
     vector_store,
-
 ) -> None:
-
+    """Render YouTube-style concept evidence cards with timestamp chips."""
     answer = result.answer
-
     if not answer.evidence_ids:
-
         return
 
     concept_lookup = _build_concept_lookup(
-
         vector_store,
-
         answer.video_id,
-
     )
-
     if not concept_lookup:
-
         return
-
-    # ----------------------------------------------------------
-
-    # Keep the order returned by the QA pipeline.
-
-    # ----------------------------------------------------------
 
     concepts = []
     for evidence_id in answer.evidence_ids:
@@ -239,332 +267,111 @@ def _render_evidence_details(
         return
 
     with st.expander(
-        f"🎞️ Lecture Evidence ({len(concepts)} relevant sections)",
+        f"🎞️ Lecture Evidence  ·  {len(concepts)} relevant section(s)",
         expanded=True,
     ):
-        st.caption(
-            "These sections show the lecture evidence ranked by relevance to your question."
-        )
-
-        for index, concept in enumerate(
-            concepts,
-            start=1,
-        ):
+        for idx, concept in enumerate(concepts, start=1):
             start = _format_time(concept.start_time)
-            end = _format_time(concept.end_time)
+            end   = _format_time(concept.end_time)
+            topic = concept.topic or concept.concept or "Lecture section"
 
+            # ── Header chip row ──────────────────────────────
             st.markdown(
-                f"### {index}. Lecture section — {start} to {end}"
+                f"""
+                <div class="concept-bullet">
+                <b>{idx}. {topic}</b>
+                <span class="ts-chip">⏱ {start} – {end}</span>
+                </div>
+                """,
+                unsafe_allow_html=True,
             )
 
-            # --------------------------------------------------
+            col_s, col_v = st.columns(2)
 
-            # Topic
-
-            # --------------------------------------------------
-
-            if concept.topic:
-
-                st.markdown(
-
-                    f"**Topic:** {concept.topic}"
-
-                )
-
-            # --------------------------------------------------
-
-            # Speech
-
-            # --------------------------------------------------
-
-            if concept.speech_text:
-
-                st.markdown(
-
-                    "**🗣️ What the lecturer said**"
-
-                )
-
-                st.write(
-
-                    concept.speech_text
-
-                )
-
-            # --------------------------------------------------
-
-            # Visual
-
-            # --------------------------------------------------
-
-            if concept.visual_description:
-
-                st.markdown(
-
-                    "**👁️ What was shown visually**"
-
-                )
-
-                st.write(
-
-                    concept.visual_description
-
-                )
-
-            # --------------------------------------------------
-
-            # Temporal / visual-change information
-
-            # --------------------------------------------------
-
-            if (
-
-                concept.visual_change_score > 0
-
-                or concept.selection_reasons
-
-            ):
-
-                details = []
-
-                if concept.selection_reasons:
-
-                    reasons = ", ".join(
-
-                        str(reason)
-
-                        for reason in concept.selection_reasons
-
+            with col_s:
+                if concept.speech_text and concept.speech_text.strip():
+                    st.markdown(
+                        "<div class='ev-card'>"
+                        "<div class='ev-header'>🗣️ Lecturer said</div>"
+                        f"<div class='ev-body'>{concept.speech_text.strip()}</div>"
+                        "</div>",
+                        unsafe_allow_html=True,
                     )
 
-                    details.append(
-
-                        f"Frame selection: {reasons}"
-
+            with col_v:
+                if concept.visual_description and concept.visual_description.strip():
+                    st.markdown(
+                        "<div class='ev-card'>"
+                        "<div class='ev-header'>👁️ On screen</div>"
+                        f"<div class='ev-body'>{concept.visual_description.strip()}</div>"
+                        "</div>",
+                        unsafe_allow_html=True,
                     )
 
-                if concept.visual_change_score > 0:
+            if idx < len(concepts):
+                st.markdown("<hr style='border-color:#1e3a5f;margin:8px 0'>", unsafe_allow_html=True)
 
-                    details.append(
-
-                        "Visual change score: "
-
-                        f"{concept.visual_change_score:.2f}"
-
-                    )
-
-                if details:
-
-                    st.caption(
-
-                        " • ".join(details)
-
-                    )
-
-            st.divider()
 
 def _render_result(
-
     result,
-
     vector_store,
-
 ) -> None:
-
-    answer = result.answer
-
+    """YouTube-style answer panel."""
+    answer  = result.answer
     outcome = result.overall_outcome
 
-    icon = {
-
-        VerificationOutcome.SUPPORTED: "✅",
-
-        VerificationOutcome.PARTIAL: "⚠️",
-
-        VerificationOutcome.UNSUPPORTED: "❌",
-
+    icon_map = {
+        VerificationOutcome.SUPPORTED:            "✅",
+        VerificationOutcome.PARTIAL:              "⚠️",
+        VerificationOutcome.UNSUPPORTED:          "❌",
         VerificationOutcome.INSUFFICIENT_EVIDENCE: "🔍",
+    }
+    icon = icon_map.get(outcome, "❓")
 
-    }.get(
+    displayed_answer = result.verified_answer or answer.answer
 
-        outcome,
-
-        "❓",
-
-    )
-
-    # ==========================================================
-
-    # Answer
-
-    # ==========================================================
-
-    st.subheader(
-
-        f"{icon} Answer"
-
-    )
-
-    displayed_answer = (
-
-        result.verified_answer
-
-        or answer.answer
-
-    )
+    # ── Main answer ──────────────────────────────────────────
+    st.markdown(f"#### {icon} Answer")
 
     if displayed_answer:
+        # Render each sentence / bullet on its own line so it
+        # visually resembles the YouTube right-panel layout.
+        paragraphs = [p.strip() for p in displayed_answer.split("\n") if p.strip()]
+        for para in paragraphs:
+            st.markdown(para)
 
-        st.info(
-
-            displayed_answer
-
-        )
-
-    # ==========================================================
-
-    # Explanation
-
-    # ==========================================================
-
-    if answer.explanation:
-
-        with st.expander(
-
-            "📖 Explanation",
-
-            expanded=True,
-
-        ):
-
-            st.write(
-
-                answer.explanation
-
-            )
-
-    # ==========================================================
-
-    # Lecture time range
-
-    # ==========================================================
-
+    # ── Overall timestamp range ───────────────────────────────
     if answer.timestamp_start is not None:
-
+        t_start = _format_time(answer.timestamp_start)
+        t_end   = _format_time(answer.timestamp_end)
         st.markdown(
-
-            "### ⏱️ Relevant lecture section"
-
+            f"<span class='ts-chip' style='font-size:0.85rem;'>⏱ {t_start} – {t_end}</span>"
+            "&nbsp;&nbsp;<span style='color:#64748b;font-size:0.8rem;'>overall lecture range</span>",
+            unsafe_allow_html=True,
         )
 
-        c1, c2 = st.columns(2)
+    st.markdown("")
 
-        c1.metric(
+    # ── Explanation ───────────────────────────────────────────
+    if answer.explanation:
+        with st.expander("📖 How this answer was constructed", expanded=False):
+            st.write(answer.explanation)
 
-            "Start",
+    # ── Lecture evidence sections ─────────────────────────────
+    _render_evidence_details(result, vector_store)
 
-            _format_time(
-
-                answer.timestamp_start
-
-            ),
-
-        )
-
-        c2.metric(
-
-            "End",
-
-            _format_time(
-
-                answer.timestamp_end
-
-            ),
-
-        )
-
-        st.caption(
-
-            "The time range covers the retrieved lecture "
-
-            "sections used to construct the answer."
-
-        )
-
-    # ==========================================================
-
-    # Multimodal lecture evidence
-
-    # ==========================================================
-
-    _render_evidence_details(
-
-        result,
-
-        vector_store,
-
-    )
-
-    # ==========================================================
-
-    # Claim verification
-
-    #
-
-    # Internal evidence IDs are deliberately hidden from the
-
-    # student-facing UI.
-
-    # ==========================================================
-
+    # ── Claim verification (collapsed by default) ─────────────
     if result.claim_verifications:
-
-        with st.expander(
-
-            f"🔬 Answer Verification ({outcome.value})"
-
-        ):
-
+        with st.expander(f"🔬 Claim Verification ({outcome.value})", expanded=False):
             for verification in result.claim_verifications:
-
-                if (
-
-                    verification.outcome
-
-                    == VerificationOutcome.SUPPORTED
-
-                ):
-
+                if verification.outcome == VerificationOutcome.SUPPORTED:
                     cv_icon = "✅"
-
-                elif (
-
-                    verification.outcome
-
-                    == VerificationOutcome.PARTIAL
-
-                ):
-
+                elif verification.outcome == VerificationOutcome.PARTIAL:
                     cv_icon = "⚠️"
-
                 else:
-
                     cv_icon = "❌"
-
-                st.markdown(
-
-                    f"{cv_icon} {verification.claim}"
-
-                )
-
-                st.caption(
-
-                    f"Support confidence: "
-
-                    f"{verification.confidence:.0%}"
-
-                )
-
+                st.markdown(f"{cv_icon} {verification.claim}")
+                st.caption(f"Support confidence: {verification.confidence:.0%}")
                 st.divider()
 
 # ==============================================================
@@ -797,7 +604,20 @@ if ingest_clicked:
                     subject = dl_info.title
                 dl_progress.empty()
             except Exception as dl_err:
-                st.sidebar.error(f"❌ Failed to download video: {dl_err}")
+                err_str = str(dl_err)
+                if "403" in err_str or "Forbidden" in err_str:
+                    st.sidebar.error("❌ YouTube blocked the download (HTTP 403).")
+                    st.sidebar.info(
+                        "**Fix: Export cookies from your browser**\n\n"
+                        "1. Install the **[Get cookies.txt LOCALLY](https://chromewebstore.google.com/detail/get-cookiestxt-locally/cclelndahbckbenkjhflpdbgdldlbecc)** Chrome extension.\n"
+                        "2. Open **youtube.com**, sign in to your Google account.\n"
+                        "3. Click the extension icon → Export cookies → save as `cookies.txt`.\n"
+                        "4. Put `cookies.txt` in the project root:\n"
+                        "   `d:\\\\Mainproject\\\\VLLM-branch-qwen-changes (1)\\\\VLLM-branch-qwen-changes\\\\cookies.txt`\n"
+                        "5. Retry the download."
+                    )
+                else:
+                    st.sidebar.error(f"❌ Failed to download video: {dl_err}")
                 logger.error(f"video_url_download_failed | {dl_err}")
 
     if video_to_process:
@@ -850,338 +670,248 @@ tab_qa, tab_library, tab_eval = st.tabs(
 )
 
 # ==============================================================
-
 # QA Tab
-
 # ==============================================================
 
 with tab_qa:
 
-    video_id_filter = st.text_input(
+    # ── Video selector ────────────────────────────────────────
+    _vs_for_qa = get_vector_store()
+    _known_video_ids: list[str] = []
+    try:
+        if hasattr(_vs_for_qa, "list_videos"):
+            _known_video_ids = _vs_for_qa.list_videos()
+        else:
+            # Fallback: derive from a broad search (ChromaDB)
+            _dummy_emb = [0.0] * 384
+            _all_c = _vs_for_qa.search(_dummy_emb, top_k=200)
+            _known_video_ids = sorted({c.video_id for c in _all_c if c.video_id})
+    except Exception:
+        _known_video_ids = []
 
-        "Filter by video ID "
+    _video_options = ["🌐 All videos"] + _known_video_ids
 
-        "(optional — leave blank to search all ingested lectures)",
+    # If a video was just ingested, pre-select it
+    _default_idx = 0
+    if st.session_state.ingested_video_id and st.session_state.ingested_video_id in _known_video_ids:
+        _default_idx = _known_video_ids.index(st.session_state.ingested_video_id) + 1  # +1 for "All videos"
 
-        value=(
-
-            st.session_state.ingested_video_id
-
-            or ""
-
-        ),
-
+    _selected_video_label = st.selectbox(
+        "🎬 Filter by video",
+        options=_video_options,
+        index=_default_idx,
+        help="Select a specific ingested lecture or leave on 'All videos' to search across everything.",
     )
+    video_id_filter = "" if _selected_video_label == "🌐 All videos" else _selected_video_label
+
+    if video_id_filter:
+        st.caption(f"🔒 Searching within: `{video_id_filter}`")
+    else:
+        st.caption("🔍 Searching across all ingested lectures")
 
     question = st.text_area(
-
         "Your question",
-
-        placeholder=(
-
-            "What is the TCP three-way handshake?"
-
-        ),
-
+        placeholder="What is the TCP three-way handshake?",
+        height=90,
     )
 
-    ask_clicked = st.button(
-
-        "🔍 Ask",
-
-        type="primary",
-
-    )
+    ask_clicked = st.button("🔍 Ask", type="primary")
 
     if ask_clicked:
-
         if not question.strip():
-
-            st.warning(
-
-                "Please enter a question."
-
-            )
-
+            st.warning("Please enter a question.")
         else:
-
             (
-
                 ingest_orch,
-
                 vector_store,
-
                 embedder,
-
                 qwen_runtime,
-
             ) = build_ingest_orchestrator()
 
             qa_orch = build_qa_orchestrator(
-
                 vector_store,
-
                 embedder,
-
                 qwen_runtime,
-
             )
 
-            with st.spinner(
-
-                "Retrieving multimodal lecture context "
-
-                "and generating answer…"
-
-            ):
-
+            with st.spinner("Retrieving multimodal lecture context and generating answer…"):
                 try:
-
                     result = qa_orch.ask(
-
                         question.strip(),
-
-                        video_id=(
-
-                            video_id_filter.strip()
-
-                            or None
-
-                        ),
-
+                        video_id=video_id_filter.strip() or None,
                     )
-
-                    _render_result(
-
-                        result,
-
-                        vector_store,
-
-                    )
-
+                    _render_result(result, vector_store)
                 except Exception as exc:
-
-                    st.error(
-
-                        f"❌ QA failed: {exc}"
-
-                    )
-
-                    logger.error(
-
-                        f"ui_qa_error | {exc}"
-
-                    )
+                    st.error(f"❌ QA failed: {exc}")
+                    logger.error(f"ui_qa_error | {exc}")
 
 # ==============================================================
-
-# Library Tab
-
+# Library / Browse Videos Tab
 # ==============================================================
 
 with tab_library:
 
-    st.subheader(
+    st.subheader("📂 Browse Videos in Pinecone DB")
 
-        "Ingested Videos"
+    lib_vs = get_vector_store()
 
-    )
-
-    vector_store = get_vector_store()
-
-    all_concepts = []
-
+    # ── Collect video IDs ─────────────────────────────────────
+    lib_video_ids: list[str] = []
+    lib_all_concepts: list = []
     try:
-
-        # Collect concepts to derive unique video IDs.
-
-        #
-
-        # ChromaVectorStore does not currently expose a
-
-        # list_videos() method, so we use the existing search
-
-        # interface as a lightweight peek.
-
-        dummy_emb = [0.0] * 384
-
-        all_concepts = vector_store.search(
-
-            dummy_emb,
-
-            top_k=200,
-
-        )
-
+        if hasattr(lib_vs, "list_videos"):
+            lib_video_ids = lib_vs.list_videos()
+        else:
+            _d = [0.0] * 384
+            lib_all_concepts = lib_vs.search(_d, top_k=500)
+            lib_video_ids = sorted({c.video_id for c in lib_all_concepts if c.video_id})
     except Exception:
-
         pass
 
-    video_ids = sorted(
-
-        {
-
-            concept.video_id
-
-            for concept in all_concepts
-
-        }
-
-    )
-
-    if not video_ids:
-
-        st.info(
-
-            "No videos ingested yet. "
-
-            "Upload one using the sidebar."
-
-        )
-
+    if not lib_video_ids:
+        st.info("No videos ingested yet. Upload one using the sidebar.")
     else:
+        st.caption(f"{len(lib_video_ids)} lecture(s) stored in Pinecone")
+        st.markdown("---")
 
-        for vid in video_ids:
+        # ── Session state: which video is expanded ────────────
+        if "lib_selected_vid" not in st.session_state:
+            st.session_state.lib_selected_vid = None
 
-            concepts = [
+        # ── Left panel: video cards ───────────────────────────
+        col_list, col_detail = st.columns([1, 2], gap="large")
 
-                concept
-
-                for concept in all_concepts
-
-                if concept.video_id == vid
-
-            ]
-
-            subjects = {
-
-                concept.subject
-
-                for concept in concepts
-
-                if concept.subject
-
-            }
-
-            topics = {
-
-                concept.topic
-
-                for concept in concepts
-
-                if concept.topic
-
-            }
-
-            duration = (
-
-                max(
-
-                    concept.end_time
-
-                    for concept in concepts
-
-                )
-
-                if concepts
-
-                else 0.0
-
-            )
-
-            with st.expander(
-
-                f"🎬 {vid}"
-
-            ):
-
-                col1, col2, col3 = st.columns(3)
-
-                col1.metric(
-
-                    "Concepts",
-
-                    len(concepts),
-
-                )
-
-                col2.metric(
-
-                    "Duration",
-
-                    _format_time(duration),
-
-                )
-
-                col3.metric(
-
-                    "Topics",
-
-                    len(topics),
-
-                )
-
-                if subjects:
-
-                    st.caption(
-
-                        "Subjects: "
-
-                        + ", ".join(
-
-                            sorted(subjects)
-
-                        )
-
-                    )
-
-                if topics:
-
-                    st.caption(
-
-                        "Topics: "
-
-                        + ", ".join(
-
-                            sorted(topics)
-
-                        )
-
-                    )
-
-                if st.button(
-
-                    f"🗑️ Delete {vid}",
-
-                    key=f"del_{vid}",
-
-                ):
-
+        with col_list:
+            st.markdown("### 🎬 Videos")
+            for vid in lib_video_ids:
+                # Fetch summary info (from already-fetched concepts if available)
+                vid_concepts = [c for c in lib_all_concepts if c.video_id == vid]
+                if not vid_concepts:
                     try:
+                        vid_concepts = lib_vs.get_by_video(vid)
+                    except Exception:
+                        vid_concepts = []
 
-                        vector_store.delete_by_video(
+                subjects = sorted({c.subject for c in vid_concepts if c.subject})
+                duration = max((c.end_time for c in vid_concepts), default=0.0)
+                n_topics = len({c.topic for c in vid_concepts if c.topic})
 
-                            vid
+                # Card styling
+                is_selected = st.session_state.lib_selected_vid == vid
+                card_bg = "#1e3a5f" if is_selected else "#111827"
+                border_c = "#3b82f6" if is_selected else "#1e293b"
 
-                        )
+                label_top = subjects[0] if subjects else "Unknown subject"
+                label_id  = vid[:8] + "…"  # show truncated UUID
 
-                        st.success(
+                st.markdown(
+                    f"""
+                    <div style="background:{card_bg};border:1px solid {border_c};
+                    border-radius:8px;padding:10px 14px;margin-bottom:8px;cursor:pointer">
+                    <div style="color:#e2e8f0;font-weight:600;font-size:0.95rem">{label_top}</div>
+                    <div style="color:#64748b;font-size:0.75rem;margin-top:2px">
+                      🆔 {label_id} &nbsp;|&nbsp; ⏱ {_format_time(duration)} &nbsp;|&nbsp; 📌 {len(vid_concepts)} concepts
+                    </div>
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
+                if st.button(
+                    f"{'✅ ' if is_selected else ''}View  {label_id}",
+                    key=f"lib_sel_{vid}",
+                    use_container_width=True,
+                ):
+                    st.session_state.lib_selected_vid = vid
+                    st.rerun()
 
-                            "Deleted lecture from "
+        # ── Right panel: concept timeline ─────────────────────
+        with col_detail:
+            sel = st.session_state.lib_selected_vid
 
-                            "the vector store."
+            if sel is None:
+                st.markdown(
+                    "<div style='color:#475569;margin-top:60px;text-align:center'>"
+                    "← Select a video to browse its concepts"
+                    "</div>",
+                    unsafe_allow_html=True,
+                )
+            else:
+                # Fetch concepts for selected video
+                sel_concepts: list = [c for c in lib_all_concepts if c.video_id == sel]
+                if not sel_concepts:
+                    try:
+                        sel_concepts = lib_vs.get_by_video(sel)
+                    except Exception:
+                        sel_concepts = []
 
-                        )
+                sel_concepts.sort(key=lambda c: c.start_time)
 
+                subjects_sel = sorted({c.subject for c in sel_concepts if c.subject})
+                topics_sel   = sorted({c.topic   for c in sel_concepts if c.topic})
+                duration_sel = max((c.end_time for c in sel_concepts), default=0.0)
+
+                # ── Header ───────────────────────────────────
+                st.markdown(
+                    f"### {'  ·  '.join(subjects_sel) if subjects_sel else 'Lecture'}"
+                )
+                st.caption(f"Video ID: `{sel}`")
+
+                m1, m2, m3 = st.columns(3)
+                m1.metric("Concepts",  len(sel_concepts))
+                m2.metric("Duration",  _format_time(duration_sel))
+                m3.metric("Topics",    len(topics_sel))
+
+                if topics_sel:
+                    with st.expander("📌 Topics in this lecture", expanded=False):
+                        for t in topics_sel:
+                            st.markdown(f"- {t}")
+
+                # ── Delete button ─────────────────────────────
+                if st.button(f"🗑️ Delete this lecture", key=f"lib_del_{sel}"):
+                    try:
+                        lib_vs.delete_by_video(sel)
+                        st.session_state.lib_selected_vid = None
+                        st.success("Lecture deleted from Pinecone.")
                         st.rerun()
-
                     except Exception as exc:
+                        st.error(f"Delete failed: {exc}")
 
-                        st.error(
+                st.markdown("---")
+                st.markdown("#### 📅 Concept Timeline")
 
-                            f"Delete failed: {exc}"
+                # ── Concept timeline ──────────────────────────
+                for concept in sel_concepts:
+                    t_start = _format_time(concept.start_time)
+                    t_end   = _format_time(concept.end_time)
+                    topic_label = concept.topic or concept.concept or "—"
 
-                        )
+                    with st.expander(
+                        f"{t_start} – {t_end}  ·  {topic_label}",
+                        expanded=False,
+                    ):
+                        c_sp, c_vi = st.columns(2)
+                        with c_sp:
+                            if concept.speech_text and concept.speech_text.strip():
+                                st.markdown(
+                                    "<div class='ev-card'>"
+                                    "<div class='ev-header'>🗣️ Lecturer said</div>"
+                                    f"<div class='ev-body'>{concept.speech_text.strip()}</div>"
+                                    "</div>",
+                                    unsafe_allow_html=True,
+                                )
+                            else:
+                                st.caption("No speech recorded.")
+                        with c_vi:
+                            if concept.visual_description and concept.visual_description.strip():
+                                st.markdown(
+                                    "<div class='ev-card'>"
+                                    "<div class='ev-header'>👁️ On screen</div>"
+                                    f"<div class='ev-body'>{concept.visual_description.strip()}</div>"
+                                    "</div>",
+                                    unsafe_allow_html=True,
+                                )
+                            else:
+                                st.caption("No visual description.")
 
 # ==============================================================
 

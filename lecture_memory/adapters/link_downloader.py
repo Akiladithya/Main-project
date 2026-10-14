@@ -42,9 +42,29 @@ class VideoLinkDownloader:
     Downloads and prepares video files from online links.
     """
 
+    # Locations searched (in order) for a Netscape-format cookies file.
+    # Place cookies.txt exported from your browser in any of these paths.
+    _COOKIES_SEARCH_PATHS = [
+        Path("cookies.txt"),           # project root (cwd)
+        Path.home() / "cookies.txt",   # user home
+    ]
+
     def __init__(self, download_dir: Optional[str] = None) -> None:
         self.download_dir = Path(download_dir or os.path.join(settings.media_storage_dir, "downloads"))
         self.download_dir.mkdir(parents=True, exist_ok=True)
+        self._cookies_file: Optional[str] = self._locate_cookies()
+        if self._cookies_file:
+            logger.info(f"yt_dlp_cookies_loaded | path={self._cookies_file}")
+        else:
+            logger.debug("yt_dlp_no_cookies | YouTube downloads may fail if cookies are required")
+
+    @classmethod
+    def _locate_cookies(cls) -> Optional[str]:
+        """Return the first cookies.txt path that exists, or None."""
+        for p in cls._COOKIES_SEARCH_PATHS:
+            if p.exists():
+                return str(p.resolve())
+        return None
 
     @staticmethod
     def is_valid_url(url: str) -> bool:
@@ -53,6 +73,20 @@ class VideoLinkDownloader:
             return False
         parsed = urllib.parse.urlparse(url.strip())
         return parsed.scheme in ("http", "https") and bool(parsed.netloc)
+
+    # YouTube clients tried in order — android_vr bypasses SABR streaming issues
+    _YT_PLAYER_CLIENTS = ["android_vr", "ios", "web"]
+
+    def _ydl_extractor_args(self) -> dict:
+        """Return extractor_args that work around YouTube SABR/page-reload errors."""
+        return {"youtube": {"player_client": self._YT_PLAYER_CLIENTS}}
+
+    def _base_ydl_opts(self) -> dict:
+        """Common yt-dlp options shared by both get_info() and download()."""
+        opts: dict = {"extractor_args": self._ydl_extractor_args()}
+        if self._cookies_file:
+            opts["cookiefile"] = self._cookies_file
+        return opts
 
     def get_info(self, url: str) -> dict:
         """
@@ -64,6 +98,7 @@ class VideoLinkDownloader:
             "no_warnings": True,
             "skip_download": True,
             "extract_flat": False,
+            **self._base_ydl_opts(),
         }
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             try:
@@ -129,6 +164,7 @@ class VideoLinkDownloader:
             # Windows filename sanitization
             "windowsfilenames": True,
             "noplaylist": True,
+            **self._base_ydl_opts(),
         }
 
         logger.info(f"Downloading video from URL: {url}")

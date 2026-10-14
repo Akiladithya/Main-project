@@ -56,6 +56,10 @@ class Settings(BaseSettings):
     subject_extraction_model: str = "gemini-2.5-flash"
 
     embedding_model: str = "all-MiniLM-L6-v2"
+    use_cpu: bool = Field(
+        default=False,
+        alias="USE_CPU",
+    )
 
     # ============================================================
     # FRAME SELECTION

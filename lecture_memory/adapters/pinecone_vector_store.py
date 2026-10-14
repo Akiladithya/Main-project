@@ -237,6 +237,40 @@ class PineconeVectorStore(IVectorStore):
             logger.error(f"pinecone_delete_error | video_id={video_id} | error={e}")
 
     # ========================================================
+    # LIST ALL KNOWN VIDEO IDs
+    # ========================================================
+
+    def list_videos(self) -> List[str]:
+        """
+        Return a sorted list of distinct video_id values currently
+        stored in the Pinecone index.
+
+        Uses a broad dummy-vector query (top_k=1000) and collects
+        unique video_id values from metadata.
+        """
+        dummy_vector = [0.01] * _DEFAULT_DIMENSION
+        try:
+            res = self._index.query(
+                vector=dummy_vector,
+                top_k=1000,
+                include_metadata=True,
+                include_values=False,
+            )
+        except Exception as e:
+            logger.warning(f"pinecone_list_videos_warning | error={e}")
+            return []
+
+        matches = res.get("matches", []) if isinstance(res, dict) else getattr(res, "matches", [])
+        video_ids: set[str] = set()
+        for match in matches:
+            meta = match.get("metadata", {}) if isinstance(match, dict) else getattr(match, "metadata", {})
+            vid = meta.get("video_id", "")
+            if vid:
+                video_ids.add(vid)
+
+        return sorted(video_ids)
+
+    # ========================================================
     # CONCEPT -> PINECONE METADATA
     # ========================================================
 
